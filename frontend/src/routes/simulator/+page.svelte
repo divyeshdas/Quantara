@@ -13,14 +13,20 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let result = $state<SimulationResponse | null>(null);
-	let sidebarOpen = $state(true);
 
-	async function run() {
+	async function runSimulation() {
 		loading = true;
 		error = null;
 		try {
-			const req = { current_rate: currentRate, horizon_months: horizonMonths, n_paths: nPaths, use_calibrated: true };
-			result = model === 'vasicek' ? await api.simulateVasicek(req) : await api.simulateCIR(req);
+			const req = {
+				current_rate: currentRate,
+				horizon_months: horizonMonths,
+				n_paths: nPaths,
+				use_calibrated: true
+			};
+			result = model === 'vasicek'
+				? await api.simulateVasicek(req)
+				: await api.simulateCIR(req);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Simulation failed';
 		} finally {
@@ -28,389 +34,444 @@
 		}
 	}
 
-	onMount(run);
+	onMount(() => {
+		runSimulation();
+	});
 
 	const td = $derived(result?.terminal_distribution);
 </script>
 
-<svelte:head><title>Simulator — Quantara</title></svelte:head>
+<svelte:head>
+	<title>Simulator — Quantara</title>
+</svelte:head>
 
 <div class="page">
-
-	<!-- ── Page header ───────────────────────────────────────── -->
-	<div class="page-head">
-		<div>
-			<div class="data-label" style="margin-bottom:0.375rem">Rate Path Simulator</div>
-			<h1 style="font-size:clamp(1.5rem,3vw,2.25rem)">10,000 possible futures</h1>
-		</div>
-		{#if result}
-			<div class="head-stat">
-				<div class="data-label">Median terminal</div>
-				<div class="stat-number">{result.terminal_distribution.p50.toFixed(2)}%</div>
-			</div>
-			<div class="head-stat">
-				<div class="data-label">Range (p5 – p95)</div>
-				<div class="stat-number">
-					{result.terminal_distribution.p5.toFixed(2)} – {result.terminal_distribution.p95.toFixed(2)}%
-				</div>
-			</div>
-			<div class="head-stat">
-				<div class="data-label">P(rate rises)</div>
-				<div class="stat-number" class:up={result.prob_increase > 0.5} class:down={result.prob_increase <= 0.5}>
-					{(result.prob_increase * 100).toFixed(1)}%
-				</div>
-			</div>
-		{/if}
+	<div class="page-header">
+		<div class="page-eyebrow">Rate Path Simulator</div>
+		<h1>10,000 possible futures</h1>
+		<p class="page-sub">Stochastic simulation of RBI repo rate paths using MLE-calibrated parameters from historical data.</p>
 	</div>
 
-	<hr />
+	<hr class="section-rule" />
 
-	<div class="layout">
+	<div class="simulator-layout">
+		<!-- Left: controls -->
+		<aside class="controls-panel">
+			<div class="control-group">
+				<label class="ctrl-label" for="rate-input">Current Rate (%)</label>
+				<input
+					id="rate-input"
+					type="number"
+					min="0" max="25" step="0.25"
+					bind:value={currentRate}
+					class="ctrl-input mono"
+				/>
+			</div>
 
-		<!-- ── Sidebar ─────────────────────────────────────────── -->
-		<aside class="sidebar" class:collapsed={!sidebarOpen}>
-			<button class="sidebar-toggle" onclick={() => sidebarOpen = !sidebarOpen} title="Toggle panel">
-				{sidebarOpen ? '‹' : '›'}
+			<div class="control-group">
+				<label class="ctrl-label" for="horizon-input">Horizon (months)</label>
+				<input
+					id="horizon-input"
+					type="range"
+					min="1" max="24"
+					bind:value={horizonMonths}
+					class="ctrl-range"
+				/>
+				<span class="ctrl-range-val mono">{horizonMonths} months</span>
+			</div>
+
+			<div class="control-group">
+				<label class="ctrl-label" for="paths-input">Number of Paths</label>
+				<select id="paths-input" bind:value={nPaths} class="ctrl-select mono">
+					<option value={1000}>1,000</option>
+					<option value={5000}>5,000</option>
+					<option value={10000}>10,000</option>
+					<option value={25000}>25,000</option>
+					<option value={50000}>50,000</option>
+				</select>
+			</div>
+
+			<div class="control-group">
+				<div class="ctrl-label">Model</div>
+				<div class="model-toggle">
+					<button
+						class="toggle-btn"
+						class:active={model === 'cir'}
+						onclick={() => (model = 'cir')}
+					>CIR</button>
+					<button
+						class="toggle-btn"
+						class:active={model === 'vasicek'}
+						onclick={() => (model = 'vasicek')}
+					>Vasicek</button>
+				</div>
+			</div>
+
+			<button class="run-btn" onclick={runSimulation} disabled={loading}>
+				{loading ? 'Simulating…' : 'Run Simulation'}
 			</button>
 
-			{#if sidebarOpen}
-				<div class="controls">
-					<div class="ctrl-section">
-						<div class="ctrl-section-title">Parameters</div>
-
-						<div class="ctrl-row">
-							<label class="label" for="rate">Starting Rate</label>
-							<div class="rate-input-wrap">
-								<input id="rate" type="number" min="0" max="25" step="0.25"
-									bind:value={currentRate} class="input" />
-								<span class="rate-suffix mono">%</span>
-							</div>
-						</div>
-
-						<div class="ctrl-row">
-							<label class="label" for="horizon">
-								Horizon
-								<span class="mono" style="float:right;color:var(--ink)">{horizonMonths}mo</span>
-							</label>
-							<input id="horizon" type="range" min="1" max="24"
-								bind:value={horizonMonths} class="range-input" />
-							<div class="range-labels">
-								<span class="faint mono">1 month</span>
-								<span class="faint mono">24 months</span>
-							</div>
-						</div>
-
-						<div class="ctrl-row">
-							<label class="label" for="paths">Paths</label>
-							<select id="paths" bind:value={nPaths} class="input">
-								<option value={1000}>1,000</option>
-								<option value={5000}>5,000</option>
-								<option value={10000}>10,000</option>
-								<option value={25000}>25,000</option>
-								<option value={50000}>50,000</option>
-							</select>
-						</div>
-					</div>
-
-					<div class="ctrl-section">
-						<div class="ctrl-section-title">Model</div>
-						<div class="model-pills">
-							<button class="pill" class:active={model === 'cir'} onclick={() => model = 'cir'}>
-								CIR
-								<span class="pill-sub">r ≥ 0</span>
-							</button>
-							<button class="pill" class:active={model === 'vasicek'} onclick={() => model = 'vasicek'}>
-								Vasicek
-								<span class="pill-sub">constant σ</span>
-							</button>
-						</div>
-					</div>
-
-					<button class="run-btn" onclick={run} disabled={loading}>
-						{loading ? 'Simulating…' : 'Run →'}
-					</button>
-
-					{#if result}
-						<ModelParams {result} />
-					{/if}
-				</div>
+			{#if result}
+				<ModelParams {result} />
 			{/if}
 		</aside>
 
-		<!-- ── Main chart area ────────────────────────────────── -->
-		<main class="chart-area">
+		<!-- Main: chart -->
+		<div class="chart-panel">
 			{#if error}
-				<div class="error-box">{error}</div>
+				<div class="error-msg">{error}</div>
 			{:else if loading}
-				<div class="loading-center">
-					<div class="loading-line"></div>
-					<p class="mono" style="font-size:0.8125rem;color:var(--ink-soft);margin-top:1rem">
-						Simulating {nPaths.toLocaleString()} paths…
-					</p>
+				<div class="loading-state">
+					<div class="loading-bar"></div>
+					<span class="loading-text mono">Simulating {nPaths.toLocaleString()} paths…</span>
 				</div>
 			{:else if result}
-				<div class="chart-head">
-					<div>
-						<div class="data-label">Rate paths — {model.toUpperCase()} model</div>
-						<div style="font-size:0.8125rem;color:var(--ink-soft);margin-top:0.25rem">
-							Percentile bands: 5th / 25th / median / 75th / 95th
-						</div>
-					</div>
-					<div style="display:flex;gap:0.5rem;align-items:center">
-						{#if result.cache_hit}
-							<span class="tag tag-up">cached</span>
-						{/if}
-						<span class="tag mono">{result.computation_time_ms.toFixed(0)}ms</span>
-					</div>
+				<div class="chart-header">
+					<h2 class="chart-title">Rate paths — next {horizonMonths} months</h2>
+					{#if result.cache_hit}
+						<span class="cache-badge mono">cached</span>
+					{/if}
 				</div>
 
-				<FanChart data={result.paths_summary} timeAxis={result.time_axis} height={400} />
+				<FanChart
+					data={result.paths_summary}
+					timeAxis={result.time_axis}
+					model={result.model}
+					height={420}
+				/>
 
-				<!-- Stats grid -->
+				<!-- Stats strip -->
 				{#if td}
-					<div class="stats-grid">
-						{#each [
-							{ l: 'Mean', v: td.mean.toFixed(2)+'%' },
-							{ l: 'Std dev', v: '±'+td.std.toFixed(2)+'%' },
-							{ l: '5th pct', v: td.p5.toFixed(2)+'%', cls: 'down' },
-							{ l: '25th pct', v: td.p25.toFixed(2)+'%' },
-							{ l: 'Median', v: td.p50.toFixed(2)+'%', accent: true },
-							{ l: '75th pct', v: td.p75.toFixed(2)+'%' },
-							{ l: '95th pct', v: td.p95.toFixed(2)+'%', cls: 'up' },
-							{ l: 'P(rises)', v: (result.prob_increase*100).toFixed(1)+'%' },
-						] as s}
-							<div class="stat-cell">
-								<div class="data-label">{s.l}</div>
-								<div class="stat-val mono" class:up={s.cls === 'up'} class:down={s.cls === 'down'} class:accent={s.accent}>{s.v}</div>
-							</div>
-						{/each}
+					<div class="stats-strip">
+						<div class="stat">
+							<span class="stat-label">Mean terminal</span>
+							<span class="stat-val mono">{td.mean.toFixed(2)}%</span>
+						</div>
+						<div class="stat">
+							<span class="stat-label">Std dev</span>
+							<span class="stat-val mono">±{td.std.toFixed(2)}%</span>
+						</div>
+						<div class="stat">
+							<span class="stat-label">5th pct</span>
+							<span class="stat-val mono down">{td.p5.toFixed(2)}%</span>
+						</div>
+						<div class="stat">
+							<span class="stat-label">95th pct</span>
+							<span class="stat-val mono up">{td.p95.toFixed(2)}%</span>
+						</div>
+						<div class="stat">
+							<span class="stat-label">P(rate rises)</span>
+							<span class="stat-val mono">{(result.prob_increase * 100).toFixed(1)}%</span>
+						</div>
+						<div class="stat">
+							<span class="stat-label">P(rate falls)</span>
+							<span class="stat-val mono">{(result.prob_decrease * 100).toFixed(1)}%</span>
+						</div>
 					</div>
 				{/if}
 
-				<!-- Terminal distribution -->
+				<hr class="section-rule mt-6" />
+
 				<div class="dist-section">
-					<div class="data-label" style="margin-bottom:0.25rem">Terminal rate distribution</div>
-					<div style="font-size:0.8125rem;color:var(--ink-soft);margin-bottom:1rem">
-						Where rates land at month {horizonMonths} across all paths
-					</div>
+					<h3 class="dist-title">Terminal rate distribution</h3>
+					<p class="dist-sub">Where rates land at month {horizonMonths}, across all paths</p>
 					{#if td}
-						<TerminalDistribution data={td} height={140} />
+						<TerminalDistribution data={td} height={160} />
 					{/if}
 				</div>
 			{:else}
-				<div class="loading-center">
-					<p class="faint">Configure and run a simulation.</p>
-				</div>
+				<div class="empty-state">Configure parameters and run a simulation.</div>
 			{/if}
-		</main>
-
+		</div>
 	</div>
 </div>
 
 <style>
-	.page { max-width: 1320px; margin: 0 auto; padding-bottom: 4rem; }
-
-	.page-head {
-		padding: 2rem 2rem 1.5rem;
-		display: flex;
-		align-items: flex-end;
-		gap: 3rem;
-		flex-wrap: wrap;
+	.page {
+		max-width: 1280px;
+		margin: 0 auto;
+		padding: 0 2rem 4rem;
 	}
 
-	.head-stat { display: flex; flex-direction: column; gap: 0.25rem; }
-
-	.layout {
-		display: grid;
-		grid-template-columns: 260px 1fr;
-		min-height: 600px;
+	.page-header {
+		padding: 3rem 0 2rem;
 	}
 
-	/* Sidebar */
-	.sidebar {
-		border-right: 1px solid var(--rule);
-		position: relative;
-		transition: width 0.2s;
-	}
-
-	.sidebar.collapsed { width: 28px; }
-
-	.sidebar-toggle {
-		position: absolute;
-		top: 1rem;
-		right: -14px;
-		z-index: 10;
-		width: 28px;
-		height: 28px;
-		background: var(--surface);
-		border: 1px solid var(--rule);
-		border-radius: 50%;
-		cursor: pointer;
-		font-size: 0.875rem;
-		color: var(--ink-soft);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: color 0.15s;
-	}
-
-	.sidebar-toggle:hover { color: var(--ink); }
-
-	.controls {
-		padding: 1.5rem 1.25rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		overflow: hidden;
-	}
-
-	.ctrl-section { display: flex; flex-direction: column; gap: 1rem; }
-
-	.ctrl-section-title {
+	.page-eyebrow {
+		font-family: var(--font-mono);
 		font-size: 0.6875rem;
 		text-transform: uppercase;
 		letter-spacing: 0.12em;
-		color: var(--ink-faint);
-		font-family: var(--font-mono);
-		padding-bottom: 0.5rem;
-		border-bottom: 1px solid var(--rule);
+		color: var(--accent);
+		margin-bottom: 0.75rem;
 	}
 
-	.ctrl-row { display: flex; flex-direction: column; gap: 0.375rem; }
-
-	.rate-input-wrap { position: relative; }
-	.rate-suffix {
-		position: absolute;
-		right: 0.75rem;
-		top: 50%;
-		transform: translateY(-50%);
-		color: var(--ink-soft);
-		font-size: 0.875rem;
-		pointer-events: none;
+	.page-header h1 {
+		font-size: clamp(1.75rem, 3vw, 2.5rem);
+		margin-bottom: 0.75rem;
 	}
 
-	.range-input {
-		width: 100%;
-		accent-color: var(--accent);
-		cursor: pointer;
+	.page-sub {
+		font-size: 0.9375rem;
+		color: var(--text-muted);
+		max-width: 580px;
+		line-height: 1.6;
 	}
 
-	.range-labels {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.625rem;
-		margin-top: 0.25rem;
+	.simulator-layout {
+		display: grid;
+		grid-template-columns: 280px 1fr;
+		gap: 3rem;
+		margin-top: 2.5rem;
 	}
 
-	.model-pills { display: flex; gap: 0.5rem; }
-
-	.pill {
-		flex: 1;
-		padding: 0.625rem 0.5rem;
-		border: 1px solid var(--rule);
-		border-radius: var(--radius-sm);
-		background: var(--surface);
-		cursor: pointer;
-		font-family: var(--font-mono);
-		font-size: 0.8125rem;
-		color: var(--ink-soft);
+	/* Controls */
+	.controls-panel {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 2px;
-		transition: all 0.15s;
+		gap: 1.25rem;
 	}
 
-	.pill-sub { font-size: 0.5625rem; color: var(--ink-faint); }
-
-	.pill.active {
-		border-color: var(--accent);
-		background: var(--accent-tint);
-		color: var(--accent);
-	}
-
-	.pill.active .pill-sub { color: var(--accent); opacity: 0.7; }
-
-	.run-btn {
-		width: 100%;
-		padding: 0.75rem;
-		background: var(--ink);
-		color: var(--paper);
-		border: none;
-		border-radius: var(--radius-sm);
-		font-family: var(--font-sans);
-		font-size: 0.9375rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: opacity 0.15s, transform 0.1s;
-	}
-
-	.run-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-	.run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-	/* Chart area */
-	.chart-area { padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
-
-	.chart-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-	}
-
-	.stats-grid {
-		display: grid;
-		grid-template-columns: repeat(8, 1fr);
-		border: 1px solid var(--rule);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-	}
-
-	.stat-cell {
-		padding: 0.875rem 1rem;
-		border-right: 1px solid var(--rule);
+	.control-group {
 		display: flex;
 		flex-direction: column;
 		gap: 0.375rem;
 	}
 
-	.stat-cell:last-child { border-right: none; }
-
-	.stat-val {
-		font-size: 1rem;
-		color: var(--ink);
+	.ctrl-label {
+		font-size: 0.6875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--text-faint);
+		font-family: var(--font-mono);
 	}
 
-	.stat-val.up { color: var(--up); }
-	.stat-val.down { color: var(--down); }
-	.stat-val.accent { color: var(--accent); font-weight: 500; }
+	.ctrl-input,
+	.ctrl-select {
+		background-color: var(--surface);
+		border: 1px solid var(--border);
+		color: var(--text-primary);
+		padding: 0.5rem 0.75rem;
+		font-size: 1rem;
+		font-family: var(--font-mono);
+		border-radius: 2px;
+		outline: none;
+		width: 100%;
+		transition: border-color 0.15s;
+	}
 
-	.dist-section { border-top: 1px solid var(--rule); padding-top: 1.5rem; }
+	.ctrl-input:focus,
+	.ctrl-select:focus {
+		border-color: var(--accent);
+	}
+
+	.ctrl-range {
+		accent-color: var(--accent);
+		width: 100%;
+	}
+
+	.ctrl-range-val {
+		font-size: 0.875rem;
+		color: var(--text-primary);
+		text-align: right;
+	}
+
+	.model-toggle {
+		display: flex;
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		overflow: hidden;
+	}
+
+	.toggle-btn {
+		flex: 1;
+		padding: 0.5rem;
+		background: var(--surface);
+		border: none;
+		cursor: pointer;
+		font-family: var(--font-mono);
+		font-size: 0.875rem;
+		color: var(--text-muted);
+		transition: background-color 0.15s, color 0.15s;
+	}
+
+	.toggle-btn.active {
+		background-color: var(--accent);
+		color: white;
+	}
+
+	.run-btn {
+		background-color: var(--ink, #1A2332);
+		color: var(--paper, #F8F5F0);
+		border: none;
+		padding: 0.75rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		border-radius: 2px;
+		transition: opacity 0.15s;
+		margin-top: 0.5rem;
+	}
+
+	:global(.dark) .run-btn {
+		background-color: var(--color-dark-text);
+		color: var(--color-dark-bg);
+	}
+
+	.run-btn:hover:not(:disabled) {
+		opacity: 0.85;
+	}
+
+	.run-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Chart panel */
+	.chart-panel {
+		min-height: 500px;
+	}
+
+	.chart-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 1rem;
+	}
+
+	.chart-title {
+		font-family: var(--font-display);
+		font-size: 1.125rem;
+	}
+
+	.cache-badge {
+		font-size: 0.6875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-up);
+		border: 1px solid var(--color-up);
+		padding: 2px 8px;
+		border-radius: 2px;
+	}
+
+	.stats-strip {
+		display: grid;
+		grid-template-columns: repeat(6, 1fr);
+		gap: 0;
+		border: 1px solid var(--border);
+		margin-top: 1.5rem;
+	}
+
+	.stat {
+		padding: 0.875rem 1rem;
+		border-right: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.stat:last-child {
+		border-right: none;
+	}
+
+	.stat-label {
+		font-size: 0.625rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--text-faint);
+		font-family: var(--font-mono);
+	}
+
+	.stat-val {
+		font-size: 1.125rem;
+		color: var(--text-primary);
+	}
+
+	.stat-val.up { color: var(--color-up); }
+	.stat-val.down { color: var(--color-down); }
+
+	.mt-6 { margin-top: 1.5rem; }
+
+	.dist-section {
+		margin-top: 1.5rem;
+	}
+
+	.dist-title {
+		font-family: var(--font-display);
+		font-size: 1rem;
+		margin-bottom: 0.25rem;
+	}
+
+	.dist-sub {
+		font-size: 0.8125rem;
+		color: var(--text-muted);
+		margin-bottom: 1rem;
+	}
 
 	/* States */
-	.loading-center {
-		flex: 1;
+	.loading-state {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		min-height: 400px;
+		height: 420px;
+		gap: 1rem;
 	}
 
-	.error-box {
-		color: var(--down);
+	.loading-bar {
+		width: 200px;
+		height: 2px;
+		background-color: var(--border);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.loading-bar::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: -100%;
+		width: 100%;
+		height: 100%;
+		background-color: var(--accent);
+		animation: slide 1.2s ease-in-out infinite;
+	}
+
+	@keyframes slide {
+		to { left: 100%; }
+	}
+
+	.loading-text {
+		font-size: 0.8125rem;
+		color: var(--text-muted);
+	}
+
+	.error-msg {
+		color: var(--color-down);
 		font-size: 0.875rem;
-		padding: 1.5rem;
-		border: 1px solid var(--down);
-		border-radius: var(--radius-sm);
-		background: color-mix(in srgb, var(--down) 6%, transparent);
+		padding: 2rem;
+		border: 1px solid var(--color-down);
+		border-radius: 2px;
+	}
+
+	.empty-state {
+		color: var(--text-faint);
+		font-size: 0.875rem;
+		padding: 4rem 0;
+		text-align: center;
 	}
 
 	@media (max-width: 900px) {
-		.layout { grid-template-columns: 1fr; }
-		.sidebar { border-right: none; border-bottom: 1px solid var(--rule); }
-		.sidebar-toggle { display: none; }
-		.stats-grid { grid-template-columns: repeat(4, 1fr); }
-		.stat-cell:nth-child(4) { border-right: none; }
-		.stat-cell:nth-child(n+5) { border-top: 1px solid var(--rule); }
+		.simulator-layout {
+			grid-template-columns: 1fr;
+		}
+
+		.stats-strip {
+			grid-template-columns: repeat(3, 1fr);
+		}
+
+		.stat {
+			border-bottom: 1px solid var(--border);
+		}
 	}
 </style>

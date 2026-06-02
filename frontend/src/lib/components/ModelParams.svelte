@@ -1,128 +1,169 @@
 <script lang="ts">
-	import type { SimulationResponse } from '$lib/api/types';
+	import type { CalibratedParams, SimulationResponse } from '$lib/api/types';
 
-	interface Props { result: SimulationResponse; }
+	interface Props {
+		result: SimulationResponse;
+	}
+
 	let { result }: Props = $props();
 
-	const p = $derived(result.calibrated_params);
+	const params = $derived(result.calibrated_params);
+
+	function fmt(v: number, dp = 4) {
+		return v.toFixed(dp);
+	}
 </script>
 
-<div class="params">
-	<div class="params-title mono">Calibrated params</div>
+<div class="params-panel">
+	<h3 class="panel-title">Calibrated Parameters</h3>
+	<hr class="section-rule" />
 
-	<div class="param-rows">
-		<div class="param-row">
-			<span class="param-sym mono">κ</span>
-			<div class="param-right">
-				<span class="param-val mono">{p.kappa.toFixed(4)}</span>
-				<span class="param-name">mean reversion speed</span>
-			</div>
+	<div class="param-grid">
+		<div class="param-item">
+			<span class="param-label mono">κ</span>
+			<span class="param-value mono">{fmt(params.kappa)}</span>
+			<span class="param-desc">Mean reversion speed — how quickly rates return to long-run average</span>
 		</div>
-		<div class="param-row">
-			<span class="param-sym mono">θ</span>
-			<div class="param-right">
-				<span class="param-val mono">{p.theta.toFixed(2)}%</span>
-				<span class="param-name">long-run mean</span>
-			</div>
+		<div class="param-item">
+			<span class="param-label mono">θ</span>
+			<span class="param-value mono">{fmt(params.theta, 2)}%</span>
+			<span class="param-desc">Long-run mean — where rates are drawn towards over time</span>
 		</div>
-		<div class="param-row">
-			<span class="param-sym mono">σ</span>
-			<div class="param-right">
-				<span class="param-val mono">{p.sigma.toFixed(4)}</span>
-				<span class="param-name">volatility</span>
-			</div>
+		<div class="param-item">
+			<span class="param-label mono">σ</span>
+			<span class="param-value mono">{fmt(params.sigma, 4)}</span>
+			<span class="param-desc">Volatility — magnitude of random rate movements</span>
 		</div>
 	</div>
 
-	<div class="meta">
-		{#if result.feller_condition_met !== undefined}
+	<hr class="section-rule mt-4" />
+
+	<div class="meta-grid">
+		<div class="meta-row">
+			<span class="meta-label">Model</span>
+			<span class="meta-val mono">{result.model.toUpperCase()}</span>
+		</div>
+		<div class="meta-row">
+			<span class="meta-label">Computed in</span>
+			<span class="meta-val mono">{result.computation_time_ms.toFixed(0)} ms</span>
+		</div>
+		<div class="meta-row">
+			<span class="meta-label">Cache</span>
+			<span class="meta-val mono" class:hit={result.cache_hit}>
+				{result.cache_hit ? 'HIT' : 'MISS'}
+			</span>
+		</div>
+
+		{#if result.model === 'cir'}
 			<div class="meta-row">
-				<span>Feller condition</span>
-				<span class="mono" class:up={result.feller_condition_met} class:down={!result.feller_condition_met}>
-					{result.feller_condition_met ? 'met' : 'violated'}
+				<span class="meta-label">Feller condition</span>
+				<span class="meta-val mono" class:ok={result.feller_condition_met} class:warn={!result.feller_condition_met}>
+					{result.feller_condition_met ? 'MET' : 'VIOLATED'}
 				</span>
 			</div>
 		{/if}
+
 		{#if result.negative_rate_probability !== undefined}
 			<div class="meta-row">
-				<span>P(r &lt; 0)</span>
-				<span class="mono">{(result.negative_rate_probability * 100).toFixed(2)}%</span>
+				<span class="meta-label">P(rate &lt; 0)</span>
+				<span class="meta-val mono">{(result.negative_rate_probability * 100).toFixed(2)}%</span>
 			</div>
 		{/if}
+
 		{#if result.used_fallback_params}
-			<div class="meta-row warn">
-				<span>Using default params</span>
-				<span>calibration failed</span>
+			<div class="meta-row warn-row">
+				<span class="meta-label">Note</span>
+				<span class="meta-val">Using default parameters — calibration did not converge</span>
 			</div>
 		{/if}
 	</div>
 </div>
 
 <style>
-	.params {
-		border: 1px solid var(--rule);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
+	.params-panel {
+		padding: 1.25rem 0;
 	}
 
-	.params-title {
-		font-size: 0.625rem;
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		color: var(--ink-faint);
-		padding: 0.625rem 0.875rem;
-		background: var(--tag-bg);
-		border-bottom: 1px solid var(--rule);
-	}
-
-	.param-rows { padding: 0.5rem 0; }
-
-	.param-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0.875rem;
-	}
-
-	.param-sym {
+	.panel-title {
+		font-family: var(--font-display);
 		font-size: 1rem;
-		color: var(--accent);
-		width: 1.25rem;
-		text-align: center;
-		flex-shrink: 0;
+		margin-bottom: 0.75rem;
 	}
 
-	.param-right {
+	.param-grid {
 		display: flex;
 		flex-direction: column;
-		gap: 1px;
+		gap: 0.875rem;
+		margin: 0.875rem 0;
 	}
 
-	.param-val {
+	.param-item {
+		display: grid;
+		grid-template-columns: 1.5rem 4rem 1fr;
+		align-items: start;
+		gap: 0.75rem;
+	}
+
+	.param-label {
+		font-size: 1.125rem;
+		color: var(--accent);
+		font-weight: 400;
+	}
+
+	.param-value {
 		font-size: 0.875rem;
-		color: var(--ink);
+		color: var(--text-primary);
+		padding-top: 2px;
 	}
 
-	.param-name {
-		font-size: 0.625rem;
-		color: var(--ink-faint);
+	.param-desc {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		line-height: 1.4;
 	}
 
-	.meta {
-		border-top: 1px solid var(--rule);
-		padding: 0.5rem 0;
+	.meta-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
 	}
 
 	.meta-row {
 		display: flex;
 		justify-content: space-between;
-		padding: 0.375rem 0.875rem;
+		align-items: center;
 		font-size: 0.75rem;
-		color: var(--ink-soft);
 	}
 
-	.meta-row.warn { color: var(--down); }
+	.meta-label {
+		color: var(--text-muted);
+	}
 
-	.up { color: var(--up); }
-	.down { color: var(--down); }
+	.meta-val {
+		color: var(--text-primary);
+	}
+
+	.meta-val.hit {
+		color: var(--color-up);
+	}
+
+	.meta-val.ok {
+		color: var(--color-up);
+	}
+
+	.meta-val.warn {
+		color: var(--color-down);
+	}
+
+	.warn-row .meta-val {
+		color: var(--color-down);
+		font-size: 0.7rem;
+		text-align: right;
+		max-width: 160px;
+	}
+
+	.mt-4 {
+		margin-top: 1rem;
+	}
 </style>

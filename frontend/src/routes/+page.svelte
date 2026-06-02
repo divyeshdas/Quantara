@@ -1,21 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
-	import type { RatePoint } from '$lib/api/types';
 
 	let currentRate = $state<number | null>(null);
 	let rateDate = $state('');
-	let history = $state<RatePoint[]>([]);
-	let rateChange = $state<number>(0);
 
 	onMount(async () => {
 		try {
-			const res = await api.historicalRates();
-			currentRate = res.current_rate;
-			history = res.data;
-			const prev = res.data.at(-2);
-			if (prev) rateChange = res.current_rate - prev.rate;
-			rateDate = res.data.at(-1)?.date ?? '';
+			const hist = await api.historicalRates();
+			currentRate = hist.current_rate;
+			rateDate = hist.data[hist.data.length - 1]?.date ?? '';
 		} catch {
 			currentRate = 5.75;
 		}
@@ -23,377 +17,424 @@
 
 	const useCases = [
 		{
-			n: '01',
+			id: 'home',
 			tag: 'Home Loan',
-			headline: 'Know your EMI across every scenario',
-			body: 'See what 10,000 rate paths mean for your monthly payment — at the 5th, 50th, and 95th percentile.',
-			href: '/emi',
+			headline: 'Know your EMI in every scenario',
+			body: 'Input your loan amount and tenure. See your monthly payment under the 5th, 50th, and 95th percentile rate paths — not just one forecast.',
+			href: '/emi'
 		},
 		{
-			n: '02',
+			id: 'bond',
 			tag: 'Bond Investor',
-			headline: 'Quantify your duration exposure',
-			body: 'Price any fixed-income instrument across all simulated rate endpoints. Modified duration and convexity computed.',
-			href: '/bond',
+			headline: 'Quantify duration risk',
+			body: 'Enter any fixed-income instrument. See how its price shifts across 10,000 simulated rate endpoints. Modified duration and convexity included.',
+			href: '/bond'
 		},
 		{
-			n: '03',
-			tag: 'Analyst',
-			headline: 'MLE-calibrated stress scenarios',
-			body: 'Statistically grounded rate scenarios for planning models and reports. Export percentile bands directly.',
-			href: '/simulator',
-		},
+			id: 'analyst',
+			tag: 'Analyst / CFO',
+			headline: 'Stress-test with calibrated paths',
+			body: 'Calibrated directly against RBI historical data via MLE. Export percentile scenarios for planning models and board presentations.',
+			href: '/simulator'
+		}
 	];
 </script>
 
-<svelte:head><title>Quantara — RBI Rate Path Simulator</title></svelte:head>
+<svelte:head>
+	<title>Quantara — RBI Rate Path Simulator</title>
+</svelte:head>
 
 <div class="page">
-
-	<!-- ── Hero ──────────────────────────────────────────────── -->
+	<!-- Hero -->
 	<section class="hero">
 		<div class="hero-inner">
-
 			<div class="hero-left">
-				<div class="eyebrow">
-					<span class="tag tag-accent">RBI Repo Rate</span>
-					{#if rateDate}<span class="faint mono" style="font-size:0.6875rem">{rateDate}</span>{/if}
-				</div>
-
-				<div class="rate-hero" class:loaded={currentRate !== null}>
-					{currentRate !== null ? currentRate.toFixed(2) : '—'}<span class="rate-unit">%</span>
-				</div>
-
-				{#if currentRate !== null}
-					<div class="rate-delta" class:up={rateChange >= 0} class:down={rateChange < 0}>
-						<span class="mono">{rateChange >= 0 ? '+' : ''}{rateChange.toFixed(2)}%</span>
-						<span style="font-size:0.75rem; margin-left:0.375rem; color:var(--ink-soft)">from previous decision</span>
-					</div>
-				{/if}
-
-				<p class="hero-desc">
-					Monte Carlo simulation of 10,000 RBI repo rate paths
-					using the Vasicek and CIR stochastic differential equations,
-					calibrated against historical data from 2011 to present.
+				<div class="eyebrow">RBI Repo Rate Simulator</div>
+				<h1 class="hero-headline">
+					Where will Indian<br />interest rates land?
+				</h1>
+				<p class="hero-sub">
+					Monte Carlo simulation of 10,000 rate paths using the Vasicek and CIR stochastic
+					differential equations, calibrated against RBI historical data.
 				</p>
-
 				<div class="hero-actions">
-					<a href="/simulator" class="btn-primary">Run Simulation →</a>
-					<a href="/compare" class="btn-ghost">Compare models</a>
+					<a href="/simulator" class="btn-primary">Run Simulation</a>
+					<a href="/compare" class="btn-ghost">Compare Models</a>
 				</div>
 			</div>
 
 			<div class="hero-right">
-				<!-- Rate history timeline -->
-				<div class="timeline-panel">
-					<div class="data-label" style="margin-bottom:0.875rem">Rate history — 2011 to present</div>
-					<div class="timeline-bars">
-						{#each history.slice(-20) as point, i}
-							{@const maxR = Math.max(...history.map(h => h.rate))}
-							{@const pct = (point.rate / maxR) * 100}
-							<div class="tbar-wrap" title="{point.date}: {point.rate}%">
-								<div class="tbar" style="height:{pct}%"></div>
-								<div class="tbar-val mono">{point.rate}</div>
-							</div>
-						{/each}
+				<div class="rate-card">
+					<div class="rate-label">RBI Repo Rate</div>
+					<div class="rate-display">
+						{currentRate !== null ? currentRate.toFixed(2) : '—'}%
 					</div>
-					<div class="timeline-footer">
-						<span class="faint mono">2019</span>
-						<span class="faint mono">2022</span>
-						<span class="faint mono">2025</span>
+					{#if rateDate}
+						<div class="rate-date">as of {rateDate}</div>
+					{/if}
+					<div class="rate-model-note">
+						Simulating forward with CIR + Vasicek models
 					</div>
 				</div>
 			</div>
-
 		</div>
 	</section>
 
-	<hr />
+	<hr class="section-rule" />
 
-	<!-- ── Model equations ───────────────────────────────────── -->
-	<section class="equations">
-		<div class="eq-inner">
-			<div class="eq-block">
-				<div class="data-label" style="margin-bottom:0.5rem">Vasicek (1977)</div>
-				<div class="sde mono">dr = κ(θ − r)dt + σ dW</div>
-				<p style="font-size:0.8125rem; margin-top:0.5rem">Constant volatility, admits negative rates</p>
-			</div>
-			<div class="eq-sep"></div>
-			<div class="eq-block">
-				<div class="data-label" style="margin-bottom:0.5rem">CIR (1985)</div>
-				<div class="sde mono">dr = κ(θ − r)dt + σ√r dW</div>
-				<p style="font-size:0.8125rem; margin-top:0.5rem">Volatility scales with rate, always ≥ 0</p>
-			</div>
-			<div class="eq-sep"></div>
-			<div class="eq-block">
-				<div class="data-label" style="margin-bottom:0.5rem">Calibration</div>
-				<div class="sde mono">MLE on RBI DBIE 2011–2025</div>
-				<p style="font-size:0.8125rem; margin-top:0.5rem">κ, θ, σ estimated via L-BFGS-B optimiser</p>
+	<!-- Use cases -->
+	<section class="use-cases">
+		<div class="use-cases-inner">
+			<div class="section-label">Three ways to use Quantara</div>
+			<div class="cards-grid">
+				{#each useCases as uc}
+					<a href={uc.href} class="use-card">
+						<div class="card-tag">{uc.tag}</div>
+						<h3 class="card-headline">{uc.headline}</h3>
+						<p class="card-body">{uc.body}</p>
+						<span class="card-link">Open →</span>
+					</a>
+				{/each}
 			</div>
 		</div>
 	</section>
 
-	<hr />
+	<hr class="section-rule" />
 
-	<!-- ── Use cases ─────────────────────────────────────────── -->
-	<section class="usecases">
-		<div class="uc-header">
-			<h2 class="uc-title">Three ways to use it</h2>
-		</div>
+	<!-- Models section -->
+	<section class="models-section">
+		<div class="models-inner">
+			<div class="section-label">The mathematics</div>
 
-		<div class="uc-grid">
-			{#each useCases as uc}
-				<a href={uc.href} class="uc-card">
-					<div class="uc-num mono">{uc.n}</div>
-					<div>
-						<div class="tag" style="margin-bottom:0.75rem">{uc.tag}</div>
-						<h3 class="uc-headline">{uc.headline}</h3>
-						<p class="uc-body">{uc.body}</p>
+			<div class="models-grid">
+				<div class="model-block">
+					<h3 class="model-name">Vasicek (1977)</h3>
+					<div class="sde mono">dr = κ(θ − r)dt + σ dW</div>
+					<p class="model-desc">
+						Mean-reverting Ornstein–Uhlenbeck process. Analytically tractable with closed-form
+						bond pricing. Can produce negative rates — appropriate for stress tests.
+					</p>
+					<div class="model-props">
+						<span class="prop"><span class="prop-key">κ</span> Mean reversion speed</span>
+						<span class="prop"><span class="prop-key">θ</span> Long-run equilibrium</span>
+						<span class="prop"><span class="prop-key">σ</span> Instantaneous volatility</span>
 					</div>
-					<div class="uc-arrow">→</div>
-				</a>
-			{/each}
+				</div>
+
+				<div class="model-divider"></div>
+
+				<div class="model-block">
+					<h3 class="model-name">Cox–Ingersoll–Ross (1985)</h3>
+					<div class="sde mono">dr = κ(θ − r)dt + σ√r dW</div>
+					<p class="model-desc">
+						Guarantees non-negative rates when the Feller condition 2κθ &gt; σ² holds.
+						Volatility scales with the rate level — empirically more accurate for emerging markets.
+					</p>
+					<div class="model-props">
+						<span class="prop"><span class="prop-key">Feller</span> 2κθ &gt; σ² ensures r &ge; 0</span>
+						<span class="prop"><span class="prop-key">Exact</span> Non-central χ² transitions</span>
+						<span class="prop"><span class="prop-key">MLE</span> Calibrated on RBI DBIE data</span>
+					</div>
+				</div>
+			</div>
 		</div>
 	</section>
 
-	<hr />
+	<hr class="section-rule" />
 
 	<footer class="site-footer">
-		<span class="faint mono">Quantara — Research tool for Indian interest rate modelling</span>
-		<a href="/simulator" class="accent mono" style="font-size:0.8125rem; text-decoration:none">Run a simulation →</a>
+		<span>Quantara — Interest Rate Research Tool</span>
+		<span>Calibrated on RBI repo rate data 2011–2025</span>
 	</footer>
-
 </div>
 
 <style>
-	.page { max-width: 1320px; margin: 0 auto; }
+	.page {
+		max-width: 1280px;
+		margin: 0 auto;
+	}
 
 	/* Hero */
-	.hero { padding: 4rem 2rem 3.5rem; }
+	.hero {
+		padding: 5rem 2rem 4rem;
+	}
 
 	.hero-inner {
 		display: grid;
-		grid-template-columns: 1fr 380px;
-		gap: 5rem;
-		align-items: start;
-	}
-
-	.hero-left { display: flex; flex-direction: column; gap: 1.5rem; }
-
-	.eyebrow { display: flex; align-items: center; gap: 1rem; }
-
-	.rate-hero {
-		font-family: var(--font-mono);
-		font-size: clamp(5rem, 13vw, 9.5rem);
-		font-weight: 400;
-		color: var(--ink);
-		line-height: 0.92;
-		letter-spacing: -0.04em;
-		opacity: 0;
-		transform: translateY(8px);
-		transition: opacity 0.5s ease, transform 0.5s ease;
-	}
-
-	.rate-hero.loaded { opacity: 1; transform: none; }
-
-	.rate-unit {
-		font-size: 0.45em;
-		color: var(--accent);
-		vertical-align: super;
-		margin-left: 0.1em;
-	}
-
-	.rate-delta {
-		display: flex;
+		grid-template-columns: 1fr 340px;
+		gap: 4rem;
 		align-items: center;
-		font-size: 0.9375rem;
-		font-weight: 500;
 	}
 
-	.rate-delta.up .mono { color: var(--up); }
-	.rate-delta.down .mono { color: var(--down); }
+	.eyebrow {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--accent);
+		margin-bottom: 1.25rem;
+		font-family: var(--font-mono);
+	}
 
-	.hero-desc {
-		font-size: 0.9375rem;
-		line-height: 1.75;
-		color: var(--ink-soft);
+	.hero-headline {
+		font-size: clamp(2.25rem, 4vw, 3.25rem);
+		line-height: 1.1;
+		margin-bottom: 1.25rem;
+	}
+
+	.hero-sub {
+		font-size: 1rem;
+		line-height: 1.7;
+		color: var(--text-muted);
 		max-width: 480px;
+		margin-bottom: 2rem;
 	}
 
 	.hero-actions {
 		display: flex;
+		gap: 1rem;
 		align-items: center;
-		gap: 1.5rem;
-		margin-top: 0.25rem;
 	}
 
-	/* Timeline panel */
-	.timeline-panel {
-		background: var(--surface);
-		border: 1px solid var(--rule);
-		border-radius: var(--radius-md);
-		padding: 1.5rem;
-		height: 100%;
-		min-height: 220px;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.timeline-bars {
-		display: flex;
-		align-items: flex-end;
-		gap: 4px;
-		flex: 1;
-		height: 120px;
-	}
-
-	.tbar-wrap {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: flex-end;
-		height: 100%;
-		gap: 3px;
-		cursor: default;
-	}
-
-	.tbar {
-		width: 100%;
-		background: var(--accent);
-		border-radius: 2px 2px 0 0;
-		opacity: 0.6;
+	.btn-primary {
+		background-color: var(--accent);
+		color: white;
+		padding: 0.625rem 1.5rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		text-decoration: none;
+		border-radius: 2px;
 		transition: opacity 0.15s;
-		min-height: 4px;
 	}
 
-	.tbar-wrap:hover .tbar { opacity: 1; }
-
-	.tbar-val {
-		font-size: 0.5rem;
-		color: var(--ink-faint);
-		white-space: nowrap;
-		transform: rotate(-90deg);
-		transform-origin: center;
-		height: 20px;
-		display: flex;
-		align-items: center;
+	.btn-primary:hover {
+		opacity: 0.88;
 	}
 
-	.timeline-footer {
-		display: flex;
-		justify-content: space-between;
-		margin-top: 0.5rem;
-		padding-top: 0.5rem;
-		border-top: 1px solid var(--rule);
+	.btn-ghost {
+		color: var(--text-muted);
+		font-size: 0.875rem;
+		text-decoration: none;
+		border-bottom: 1px solid var(--border);
+		padding-bottom: 1px;
+		transition: color 0.15s, border-color 0.15s;
 	}
 
-	/* Equations */
-	.equations { padding: 2.5rem 2rem; }
-
-	.eq-inner {
-		display: grid;
-		grid-template-columns: 1fr 1px 1fr 1px 1fr;
-		gap: 2.5rem;
-		align-items: start;
+	.btn-ghost:hover {
+		color: var(--text-primary);
+		border-color: var(--text-primary);
 	}
 
-	.eq-sep { background: var(--rule); }
-
-	.sde {
-		font-size: 0.9375rem;
-		color: var(--accent);
-		letter-spacing: 0.01em;
+	/* Rate card */
+	.rate-card {
+		border: 1px solid var(--border);
+		padding: 2rem;
+		background-color: var(--surface);
 	}
 
-	.eq-block p { color: var(--ink-soft); }
+	.rate-label {
+		font-size: 0.6875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--text-muted);
+		margin-bottom: 0.5rem;
+		font-family: var(--font-mono);
+	}
+
+	.rate-display {
+		font-family: var(--font-mono);
+		font-size: 3.5rem;
+		color: var(--text-primary);
+		line-height: 1;
+		margin-bottom: 0.375rem;
+	}
+
+	.rate-date {
+		font-size: 0.75rem;
+		color: var(--text-faint);
+		font-family: var(--font-mono);
+		margin-bottom: 1rem;
+	}
+
+	.rate-model-note {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+		border-top: 1px solid var(--border);
+		padding-top: 0.75rem;
+	}
 
 	/* Use cases */
-	.usecases { padding: 3.5rem 2rem; }
-
-	.uc-header { margin-bottom: 2.5rem; }
-
-	.uc-title {
-		font-size: clamp(1.5rem, 3vw, 2rem);
+	.use-cases {
+		padding: 4rem 2rem;
 	}
 
-	.uc-grid {
+	.use-cases-inner {
+		max-width: 1280px;
+	}
+
+	.section-label {
+		font-size: 0.6875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--text-faint);
+		margin-bottom: 2rem;
+		font-family: var(--font-mono);
+	}
+
+	.cards-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		border: 1px solid var(--rule);
-		border-radius: var(--radius-md);
-		overflow: hidden;
+		gap: 0;
+		border: 1px solid var(--border);
 	}
 
-	.uc-card {
-		padding: 2rem 1.75rem;
-		border-right: 1px solid var(--rule);
+	.use-card {
+		padding: 2rem;
+		border-right: 1px solid var(--border);
 		text-decoration: none;
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		transition: background 0.2s;
-		cursor: pointer;
+		gap: 0.75rem;
+		transition: background-color 0.15s;
 	}
 
-	.uc-card:last-child { border-right: none; }
-
-	.uc-card:hover { background: var(--accent-tint); }
-
-	.uc-num {
-		font-size: 2rem;
-		color: var(--rule);
-		font-weight: 400;
-		line-height: 1;
-		transition: color 0.2s;
+	.use-card:last-child {
+		border-right: none;
 	}
 
-	.uc-card:hover .uc-num { color: var(--accent); }
+	.use-card:hover {
+		background-color: var(--accent-faint);
+	}
 
-	.uc-headline {
+	.card-tag {
+		font-size: 0.6875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--accent);
+		font-family: var(--font-mono);
+	}
+
+	.card-headline {
 		font-family: var(--font-display);
 		font-size: 1.125rem;
-		color: var(--ink);
-		margin-bottom: 0.5rem;
-		line-height: 1.3;
+		color: var(--text-primary);
+		line-height: 1.25;
 	}
 
-	.uc-body {
+	.card-body {
 		font-size: 0.875rem;
-		color: var(--ink-soft);
-		line-height: 1.65;
+		color: var(--text-muted);
+		line-height: 1.6;
+		flex: 1;
 	}
 
-	.uc-arrow {
-		font-size: 1.25rem;
+	.card-link {
+		font-size: 0.8125rem;
 		color: var(--accent);
-		margin-top: auto;
-		opacity: 0;
-		transform: translateX(-6px);
-		transition: opacity 0.2s, transform 0.2s;
+		margin-top: 0.5rem;
 	}
 
-	.uc-card:hover .uc-arrow { opacity: 1; transform: none; }
+	/* Models */
+	.models-section {
+		padding: 4rem 2rem;
+	}
+
+	.models-inner {
+		max-width: 1280px;
+	}
+
+	.models-grid {
+		display: grid;
+		grid-template-columns: 1fr 1px 1fr;
+		gap: 3rem;
+		margin-top: 0;
+	}
+
+	.model-divider {
+		background-color: var(--border);
+		width: 1px;
+	}
+
+	.model-name {
+		font-family: var(--font-display);
+		font-size: 1.25rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.sde {
+		font-size: 1rem;
+		color: var(--accent);
+		padding: 0.75rem 1rem;
+		background-color: var(--accent-faint);
+		margin-bottom: 1rem;
+		letter-spacing: 0.02em;
+	}
+
+	.model-desc {
+		font-size: 0.875rem;
+		color: var(--text-muted);
+		line-height: 1.65;
+		margin-bottom: 1.25rem;
+	}
+
+	.model-props {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.prop {
+		font-size: 0.8125rem;
+		color: var(--text-muted);
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	.prop-key {
+		font-family: var(--font-mono);
+		color: var(--text-primary);
+		min-width: 3rem;
+	}
 
 	/* Footer */
 	.site-footer {
 		padding: 1.5rem 2rem;
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
+		font-size: 0.75rem;
+		color: var(--text-faint);
+		font-family: var(--font-mono);
 	}
 
 	/* Responsive */
-	@media (max-width: 1024px) {
-		.hero-inner { grid-template-columns: 1fr; }
-		.hero-right { display: none; }
-		.eq-inner { grid-template-columns: 1fr; }
-		.eq-sep { display: none; }
-	}
+	@media (max-width: 900px) {
+		.hero-inner {
+			grid-template-columns: 1fr;
+		}
 
-	@media (max-width: 768px) {
-		.uc-grid { grid-template-columns: 1fr; }
-		.uc-card { border-right: none; border-bottom: 1px solid var(--rule); }
-		.uc-card:last-child { border-bottom: none; }
+		.hero-right {
+			order: -1;
+		}
+
+		.cards-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.use-card {
+			border-right: none;
+			border-bottom: 1px solid var(--border);
+		}
+
+		.use-card:last-child {
+			border-bottom: none;
+		}
+
+		.models-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.model-divider {
+			display: none;
+		}
 	}
 </style>
