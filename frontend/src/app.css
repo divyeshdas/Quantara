@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "DM Serif Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
+  --font-sans: "DM Sans", "Instrument Sans", system-ui, sans-serif;
+
+  --color-paper: #F8F5F0;
+  --color-paper-dark: #EDE9E3;
+  --color-ink: #1A2332;
+  --color-ink-muted: #4A5568;
+  --color-ink-faint: #8A95A3;
+  --color-accent: #C17D3C;
+  --color-accent-light: #D4955A;
+  --color-accent-faint: #F0E6D8;
+  --color-up: #2D7A4F;
+  --color-down: #C0392B;
+
+  --color-band-p95: oklch(from var(--color-accent) l c h / 0.12);
+  --color-band-p75: oklch(from var(--color-accent) l c h / 0.25);
+  --color-band-p50: oklch(from var(--color-accent) l c h / 0.45);
+
+  /* Dark theme tokens */
+  --color-dark-bg: #0D1521;
+  --color-dark-surface: #1A2332;
+  --color-dark-border: #2A3545;
+  --color-dark-text: #E8E3DA;
+  --color-dark-muted: #8A95A3;
+}
+
+:root {
+  --bg: var(--color-paper);
+  --surface: #FFFFFF;
+  --border: #D8D2C8;
+  --text-primary: var(--color-ink);
+  --text-muted: var(--color-ink-muted);
+  --text-faint: var(--color-ink-faint);
+  --accent: var(--color-accent);
+  --accent-faint: var(--color-accent-faint);
+}
+
+.dark {
+  --bg: var(--color-dark-bg);
+  --surface: var(--color-dark-surface);
+  --border: var(--color-dark-border);
+  --text-primary: var(--color-dark-text);
+  --text-muted: var(--color-dark-muted);
+  --text-faint: #5A6575;
+  --accent: var(--color-accent-light);
+  --accent-faint: #2A2218;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--bg);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.rate-display {
+  font-family: var(--font-mono);
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.section-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+.chart-container {
+  background: transparent;
+  border: none;
+}
+
+@layer utilities {
+  .text-accent { color: var(--accent); }
+  .bg-surface { background-color: var(--surface); }
+  .border-default { border-color: var(--border); }
+  .text-primary { color: var(--text-primary); }
+  .text-muted { color: var(--text-muted); }
+  .text-faint { color: var(--text-faint); }
+  .bg-accent-faint { background-color: var(--accent-faint); }
+}
