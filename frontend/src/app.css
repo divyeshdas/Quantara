@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "DM Serif Display", Georgia, serif;
-  --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
-  --font-sans: "DM Sans", "Instrument Sans", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Syne", system-ui, sans-serif;
 
   --color-paper: #F8F5F0;
   --color-paper-dark: #EDE9E3;
