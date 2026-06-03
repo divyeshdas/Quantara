@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Literal
 
 
@@ -9,6 +9,8 @@ class ModelParamsInput(BaseModel):
 
 
 class SimulationRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     current_rate: float = Field(..., ge=0.0, le=25.0, description="Current repo rate in %")
     horizon_months: int = Field(12, ge=1, le=24)
     n_paths: int = Field(10000, ge=1000, le=50000)
