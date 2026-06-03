@@ -39,8 +39,13 @@ def simulate(
 
 
 def bond_price(r: float, tau: float, params: VasicekParams) -> float:
-    """Closed-form zero-coupon bond price P(0, tau) under Vasicek."""
-    k, th, s = params.kappa, params.theta, params.sigma
+    """Closed-form zero-coupon bond price P(0, tau) under Vasicek.
+    r must be in decimal (e.g. 0.0575). params stored in % space, converted here.
+    """
+    k = params.kappa
+    th = params.theta / 100.0
+    s = params.sigma / 100.0
+
     if k == 0:
         B = tau
     else:

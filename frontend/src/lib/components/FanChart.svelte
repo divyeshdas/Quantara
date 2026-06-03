@@ -174,9 +174,11 @@
 	}
 
 	$effect(() => {
-		if (chart && data) {
-			const echarts = { init: () => {} } as unknown;
-			renderChart(echarts as typeof import('echarts'));
+		// Re-render whenever data or timeAxis changes
+		void data;
+		void timeAxis;
+		if (chart) {
+			renderChart(null as unknown as typeof import('echarts'));
 		}
 	});
 

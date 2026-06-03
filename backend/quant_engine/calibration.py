@@ -95,7 +95,9 @@ def calibrate_cir(rates: np.ndarray, dt: float = 1 / 252) -> CalibrationResult:
     try:
         result = minimize(neg_log_likelihood, x0, bounds=bounds, method="L-BFGS-B")
         k, th, s = result.x
-        params = CIRParams(kappa=k, theta=th * 100, sigma=s * 100)
+        # CIR in % space: dr_pct = κ(θ_pct−r_pct)dt + σ_pct√r_pct dW
+        # σ_pct = σ_dec * √100 = σ_dec * 10  (not × 100 like Vasicek)
+        params = CIRParams(kappa=k, theta=th * 100, sigma=s * 10)
         converged = result.success
         ll = -result.fun
     except Exception:
