@@ -1,5 +1,7 @@
 # Quantara
 
+**Live → [getquantara.vercel.app](https://getquantara.vercel.app)**
+
 An RBI interest rate path simulator. Given the current repo rate, Quantara runs 10,000 Monte Carlo simulations using the Vasicek and CIR stochastic models and answers three practical questions:
 
 - **Home loan borrowers:** What will my EMI look like in the best, median, and worst rate scenarios 12 months from now?
